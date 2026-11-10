@@ -1,0 +1,252 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model cards {
+  id              Int           @id @default(autoincrement())
+  api_card_id     String?       @unique @db.VarChar(100)
+  name            String        @db.VarChar(150)
+  image_url       String?
+  set_name        String?       @db.VarChar(100)
+  rarity          String?       @db.VarChar(50)
+  type_line       String?       @db.VarChar(100)
+  color_identity  String?       @db.VarChar(20)
+  mana_cost       String?       @db.VarChar(50)
+  price           Decimal?      @db.Decimal(10, 2)
+  is_from_api     Boolean?      @default(true)
+  last_fetched_at DateTime?     @default(now()) @db.Timestamp(6)
+  created_at      DateTime?     @default(now()) @db.Timestamp(6)
+  listings        listings[]
+  trade_items     trade_items[]
+
+  @@index([name], map: "idx_cards_name")
+}
+
+model favorites {
+  user_id    Int
+  listing_id Int
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  listings   listings  @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_favorites_listing")
+
+  @@id([user_id, listing_id])
+}
+
+model listings {
+  id             Int                @id @default(autoincrement())
+  user_id        Int
+  card_id        Int
+  price          Decimal            @db.Decimal(10, 2)
+  condition      listing_condition?
+  language       String             @db.VarChar(20)
+  description    String?
+  status         String             @default("active") @db.VarChar(20)
+  quantity       Int                @default(1)
+  created_at     DateTime           @default(now()) @db.Timestamp(6)
+  updated_at     DateTime?          @default(now()) @db.Timestamp(6)
+  deleted_at     DateTime?          @db.Timestamp(6)
+  rarity         listing_rarity
+  game           String             @default("MAGIC") @db.VarChar(50)
+  favorites      favorites[]
+  listing_images listing_images[]
+  cards          cards              @relation(fields: [card_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_listings_card")
+  users          users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_listings_user")
+  sales          sales[]
+
+  @@index([status], map: "idx_listings_status")
+}
+
+model roles {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique @db.VarChar(50)
+  description String?
+  user_roles  user_roles[]
+}
+
+model sales {
+  id         Int       @id @default(autoincrement())
+  listing_id Int?
+  buyer_id   Int?
+  price      Decimal   @db.Decimal(10, 2)
+  quantity   Int?      @default(1)
+  status     String?   @default("pending") @db.VarChar(20)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_at DateTime? @default(now()) @db.Timestamp(6)
+  listings   listings? @relation(fields: [listing_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sales_listing")
+
+  @@index([status], map: "idx_sales_status")
+}
+
+model trade_items {
+  id       Int    @id @default(autoincrement())
+  trade_id Int
+  card_id  Int
+  quantity Int?   @default(1)
+  owner_id Int
+  cards    cards  @relation(fields: [card_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_trade_items_card")
+  trades   trades @relation(fields: [trade_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_trade_items_trade")
+}
+
+model trades {
+  id              Int           @id @default(autoincrement())
+  user_offer_id   Int
+  user_receive_id Int
+  status          String?       @default("pending") @db.VarChar(20)
+  created_at      DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at      DateTime?     @default(now()) @db.Timestamp(6)
+  trade_items     trade_items[]
+
+  @@index([status], map: "idx_trades_status")
+}
+
+model transactions_log {
+  id           Int       @id @default(autoincrement())
+  user_id      Int
+  type         String?   @db.VarChar(20)
+  amount       Decimal   @db.Decimal(10, 2)
+  reference_id Int?
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model user_roles {
+  user_id Int
+  role_id Int
+  roles   roles @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_roles_role")
+
+  @@id([user_id, role_id])
+}
+
+model users {
+  id                                              Int             @id @default(autoincrement())
+  email                                           String?         @unique @db.VarChar(150)
+  password                                        String?         @db.VarChar(255)
+  apple_id                                        String?         @unique @db.VarChar(255)
+  role                                            String?         @default("user") @db.VarChar(50)
+  accepted_terms                                  Boolean?        @default(false)
+  terms_accepted_at                               DateTime?       @db.Timestamptz(6)
+  name                                            String?         @db.VarChar(100)
+  created_at                                      DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at                                      DateTime?       @default(now()) @db.Timestamp(6)
+  listings                                        listings[]
+  profile_badges                                  profile_badges?
+  profile_stats                                   profile_stats?
+  profiles                                        profiles?
+  user_history                                    user_history[]
+  user_reviews_user_reviews_reviewer_idTousers    user_reviews[]  @relation("user_reviews_reviewer_idTousers")
+  user_reviews_user_reviews_target_user_idTousers user_reviews[]  @relation("user_reviews_target_user_idTousers")
+}
+
+model profiles {
+  id             Int       @id @default(autoincrement())
+  user_id        Int       @unique
+  name           String?   @db.VarChar(100)
+  bio            String?   @db.VarChar(500)
+  avatar_url     String?   @db.VarChar(255)
+  banner_url     String?   @db.VarChar(255)
+  location       String?   @db.VarChar(150)
+  date_of_birth  DateTime? @db.Date
+  cpf            String?   @unique @db.VarChar(20)
+  rg             String?   @db.VarChar(30)
+  phone          String?   @db.VarChar(30)
+  phone_verified Boolean?  @default(false)
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  updated_at     DateTime? @default(now()) @db.Timestamp(6)
+  users          users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_profiles_user")
+}
+
+model refresh_tokens {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  token_hash String
+  expires_at DateTime  @db.Timestamp(6)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  revoked    Boolean?  @default(false)
+
+  @@index([user_id], map: "idx_refresh_user")
+}
+
+model listing_images {
+  id         Int       @id @default(autoincrement())
+  listing_id Int
+  fs_key     String
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  listings   listings  @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model profile_badges {
+  id                 Int       @id @default(autoincrement())
+  user_id            Int       @unique
+  is_verified        Boolean?  @default(false)
+  is_top_trader      Boolean?  @default(false)
+  is_reliable_seller Boolean?  @default(false)
+  updated_at         DateTime? @default(now()) @db.Timestamp(6)
+  users              users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model profile_stats {
+  id                  Int       @id @default(autoincrement())
+  user_id             Int       @unique
+  rating_average      Decimal?  @default(0) @db.Decimal(3, 2)
+  rating_count        Int?      @default(0)
+  listings_count      Int?      @default(0)
+  trades_count        Int?      @default(0)
+  response_rate       Int?      @default(0)
+  response_time_hours Int?      @default(0)
+  cancellations_count Int?      @default(0)
+  reliability         Int?      @default(100)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+  users               users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model user_history {
+  id           Int       @id @default(autoincrement())
+  user_id      Int
+  title        String    @db.VarChar(150)
+  type         String    @db.VarChar(20)
+  amount       Decimal?  @db.Decimal(10, 2)
+  partner_name String?   @db.VarChar(100)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_user_history_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model user_reviews {
+  id                                       Int       @id @default(autoincrement())
+  reviewer_id                              Int
+  target_user_id                           Int
+  rating                                   Int
+  comment                                  String?
+  created_at                               DateTime? @default(now()) @db.Timestamp(6)
+  users_user_reviews_reviewer_idTousers    users     @relation("user_reviews_reviewer_idTousers", fields: [reviewer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_user_reviews_target_user_idTousers users     @relation("user_reviews_target_user_idTousers", fields: [target_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([target_user_id], map: "idx_user_reviews_target")
+}
+
+enum user_role_enum {
+  user
+  admin
+}
+
+enum listing_condition {
+  NM
+  LP
+  MP
+  HP
+  DMG
+}
+
+enum listing_rarity {
+  COMMON
+  UNCOMMON
+  RARE
+  MYTHIC
+}
